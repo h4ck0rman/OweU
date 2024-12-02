@@ -13,8 +13,10 @@ router.use(express.json());
 
 router.get('/', authenticateToken, async(req, res) => {
     try {
-        const userID = req.user;
-        const favours = await Favour.find({user: userID});
+        const user = req.user;
+        const favours = await Favour.find({
+            $or: [{ user: user }, { partner: user }]
+        });
 
         res.status(200).json(favours);
 
@@ -29,7 +31,6 @@ router.get('/:id', authenticateToken, async(req, res) => {
     const { id } = req.params; 
     const userID = req.user;
 
-    console.log(id);
     try {
         // Validate the ID format
         if (!mongoose.Types.ObjectId.isValid(id)) {
