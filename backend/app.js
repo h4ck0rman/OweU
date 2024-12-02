@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/sessions');
+const cookieParser = require("cookie-parser");
 require('dotenv').config(); 
 
 // initialise the application
@@ -8,6 +9,7 @@ const app = express()
 
 // Middleware 
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes 
 app.use('/auth', authRoutes);

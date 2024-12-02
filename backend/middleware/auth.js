@@ -1,3 +1,8 @@
+const jwt = require('jsonwebtoken');
+const cookieParser = require("cookie-parser");
+const { PrismaClient } = require('@prisma/client');
+require('dotenv').config(); 
+
 function validateUsername(username) {
     const usernameRegex = /^(?![_\.])[A-Za-z0-9_.]{3,30}(?<![_\.])$/;
   
@@ -44,6 +49,8 @@ function validateCreds(req, res, next) {
 }
 
 function authenticateToken(req, res, next) {
+    const cookies = req.cookies;
+    console.log(cookies)
     next();
 }
 
