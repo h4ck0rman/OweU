@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
 const cookieParser = require("cookie-parser");
-const { PrismaClient } = require('@prisma/client');
 require('dotenv').config(); 
 
 function validateUsername(username) {
