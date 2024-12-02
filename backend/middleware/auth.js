@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
-const cookieParser = require("cookie-parser");
 require('dotenv').config(); 
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not defined in .env file');
+}
 
 function validateUsername(username) {
     const usernameRegex = /^(?![_\.])[A-Za-z0-9_.]{3,30}(?<![_\.])$/;
@@ -23,19 +28,15 @@ function validatePassword(password) {
 function validateCreds(req, res, next) {
     const { username, password } = req.body;
 
-    if (!username) {
-        return res.status(400).json({error: "Username is missing"});
-    }
-    // Validate username (if present)
-    if (username) {
-        const usernameError = validateUsername(username);
-        if (usernameError) {
-            return res.status(400).json({ error: usernameError });
-        }
+    // if username or password do not exist return error message
+    if (!username || !password) {
+        return res.status(400).json({error: "Username and Password are required!"});
     }
 
-    if (!password) {
-        return res.status(400).json({error: "Password is missing"});
+    // Validate username 
+    const usernameError = validateUsername(username);
+    if (usernameError) {
+        return res.status(400).json({ error: usernameError });
     }
 
     // Validate password
@@ -47,14 +48,29 @@ function validateCreds(req, res, next) {
     next();
 }
 
+// Check if valid token is present in cookies
 function authenticateToken(req, res, next) {
-    const cookies = req.cookies;
-    console.log(cookies)
-    next();
+    try {
+        // Fetch token from cookies
+        const token = req.cookies?.token;
+
+        // if token does not exist, return with error message
+        if (!token) {
+            return res.status(401).json({ message: 'Not Logged in! Token missing.' });
+        }
+
+        // verify the jwt and fetch the payload
+        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS512'] });
+        req.user = decoded.id;
+
+        // return to calling function
+        next();
+
+    } catch (error) {
+        // Handle invalid or expired tokens
+        console.log(`Authentication Error: ${error}`);
+        res.status(401).json({message: 'Authentication failed. Invalid or expired token.'});
+    }
 }
 
-function authorizeToken(req, res, next) {
-    next();
-}
-
-module.exports = { validateCreds, authenticateToken, authorizeToken }
+module.exports = { validateCreds, authenticateToken }

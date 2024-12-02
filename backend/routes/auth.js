@@ -57,25 +57,38 @@ router.post('/login', validateCreds, async(req, res) => {
     const { username, password } = req.body;
 
     try {
-        const input_password_hash = await bcrypt.hash(password, 10);
+        // Fetch user record from mongodb through username
+        const user = await User.findOne({ username });
 
-        const user = await User.findOne({ username })
-
+        // if user does not exist, return generic login error message
         if (!user) {
             return res.status(401).json({ error: 'Either the username or the password are incorrect!' });
         }    
 
+        // compare password hashes with database
         const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+        // if password hash is invalid, return generic login error message
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Either the username or the password are incorrect!' });
         } 
 
+        // generate jwt with secret and userID
         const token = jwt.sign({id: user.id}, JWT_SECRET, {algorithm: 'HS512', expiresIn: '15m'});
 
-        res.json({message: "Login Successful!", token});
+        // add token as a cookie on the user browser
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV == 'production',
+            sameSite: 'strict',
+            maxAge: 10 * 60 * 1000,
+        });
+
+        // return response
+        res.status(200).json({message: "Login Successful!"});
 
     } catch (error) {
         console.error(error);
+        // return authentication error message for all other exceptions
         res.status(400).json({ error: "There was an issue with logging in."});
     }
 });
