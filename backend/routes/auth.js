@@ -1,13 +1,13 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
 const { validateCreds } = require('../middleware/auth');
+const User  = require('../models/User');
 
 require('dotenv').config(); 
 
 // set up the prisma client for database interactions
-const prisma = new PrismaClient();
+
 const router = express.Router();
 
 // secret key for signing and verifying JWTs
@@ -16,7 +16,6 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not defined in .env file');
 }
-
 
 // Middleware for json request bodies 
 router.use(express.json());
@@ -31,12 +30,15 @@ router.post('/register', validateCreds, async(req, res) => {
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await prisma.user.create({
-            data : {
-                username,
-                password_hash: hashedPassword,
-            }
+
+        // create user 
+        const newUser = new User({
+            username, 
+            password_hash: hashedPassword
         });
+
+        // save user to mongodb database
+        await newUser.save();
 
         res.status(201).json({ message: "User has been created!" });
     
@@ -55,27 +57,38 @@ router.post('/login', validateCreds, async(req, res) => {
     const { username, password } = req.body;
 
     try {
-        const input_password_hash = await bcrypt.hash(password, 10);
+        // Fetch user record from mongodb through username
+        const user = await User.findOne({ username });
 
-        const user = await prisma.user.findUnique({
-            where: { username },
-        });
-
+        // if user does not exist, return generic login error message
         if (!user) {
-            return res.status(401).json({ error: 'User dont exist bitch' });
+            return res.status(401).json({ error: 'Either the username or the password are incorrect!' });
         }    
 
+        // compare password hashes with database
         const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+        // if password hash is invalid, return generic login error message
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Either the username or the password are incorrect!' });
         } 
 
+        // generate jwt with secret and userID
         const token = jwt.sign({id: user.id}, JWT_SECRET, {algorithm: 'HS512', expiresIn: '15m'});
 
-        res.json({message: "Login Successful!", token});
+        // add token as a cookie on the user browser
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV == 'production',
+            sameSite: 'strict',
+            maxAge: 10 * 60 * 1000,
+        });
+
+        // return response
+        res.status(200).json({message: "Login Successful!"});
 
     } catch (error) {
         console.error(error);
+        // return authentication error message for all other exceptions
         res.status(400).json({ error: "There was an issue with logging in."});
     }
 });
